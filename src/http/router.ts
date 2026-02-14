@@ -24,6 +24,10 @@ interface StatusResponse {
     hasApiKey: boolean;
     maxToolRounds: number;
     apiBadgeId: number | null;
+    provider: string;
+    endpoint: string;
+    llmConnectorId: number | null;
+    llmConnectorLabel: string | null;
   };
   timestamp: number;
 }
@@ -43,6 +47,10 @@ export function createRouter(mcpServer: McpServer): express.Router {
           hasApiKey: Boolean(config.apiKey),
           maxToolRounds: config.maxToolRounds,
           apiBadgeId: config.apiBadgeId,
+          provider: config.provider,
+          endpoint: config.endpoint,
+          llmConnectorId: config.llmConnectorId,
+          llmConnectorLabel: config.llmConnectorLabel,
         },
         timestamp: Date.now(),
       });
@@ -55,6 +63,10 @@ export function createRouter(mcpServer: McpServer): express.Router {
           hasApiKey: false,
           maxToolRounds: 0,
           apiBadgeId: null,
+          provider: '',
+          endpoint: '',
+          llmConnectorId: null,
+          llmConnectorLabel: null,
         },
         timestamp: Date.now(),
       });
@@ -108,6 +120,10 @@ export function createRouter(mcpServer: McpServer): express.Router {
           hasApiKey: Boolean(config.apiKey),
           maxToolRounds: config.maxToolRounds,
           apiBadgeId: config.apiBadgeId,
+          provider: config.provider,
+          endpoint: config.endpoint,
+          llmConnectorId: config.llmConnectorId,
+          llmConnectorLabel: config.llmConnectorLabel,
         },
       });
     } catch (error) {

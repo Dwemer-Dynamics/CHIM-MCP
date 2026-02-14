@@ -11,12 +11,30 @@ interface ApiBadgeRow {
   api_key: string;
 }
 
+interface ConnectorRow {
+  id: number;
+  label: string | null;
+  service: string | null;
+  driver: string | null;
+  url: string | null;
+  model: string | null;
+  api_badge_id: number | null;
+  api_badge_label: string | null;
+  connector_api_key: string | null;
+}
+
+export type ProviderService = 'openrouter' | 'openai' | 'google' | 'nanogpt';
+
 export interface McpConfig {
   enabled: boolean;
   port: number;
   model: string;
   apiBadgeId: number | null;
   apiKey: string | null;
+  provider: ProviderService;
+  endpoint: string;
+  llmConnectorId: number | null;
+  llmConnectorLabel: string | null;
   systemPrompt: string | null;
   maxToolRounds: number;
 }
@@ -54,6 +72,60 @@ Accessible directories:
 
 When users ask about logs, config files, or scripts, use the filesystem tools to read them directly.`;
 
+const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+
+function getTrimmedValue(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function parseNullableInt(value: string | null | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeService(service: string | null, driver: string | null): ProviderService | null {
+  const serviceValue = (service || '').trim().toLowerCase();
+  if (serviceValue === 'openrouter' || serviceValue === 'openai' || serviceValue === 'google' || serviceValue === 'nanogpt') {
+    return serviceValue;
+  }
+
+  const driverValue = (driver || '').trim().toLowerCase();
+  if (driverValue === 'openrouterjson') {
+    return 'openrouter';
+  }
+  if (driverValue === 'openaijson') {
+    return 'openai';
+  }
+  if (driverValue === 'google_openaijson') {
+    return 'google';
+  }
+
+  return null;
+}
+
+function normalizeEndpoint(endpoint: string | null, provider: ProviderService): string {
+  const trimmed = (endpoint || '').trim().replace(/\/+$/, '');
+  if (!trimmed) {
+    if (provider === 'openrouter') {
+      return OPENROUTER_ENDPOINT;
+    }
+    return '';
+  }
+
+  if (provider === 'openrouter') {
+    return trimmed.endsWith('/chat/completions') ? trimmed : `${trimmed}/chat/completions`;
+  }
+
+  return trimmed.endsWith('/chat/completions') ? trimmed : `${trimmed}/chat/completions`;
+}
+
 /**
  * Load MCP configuration from conf_opts and core_api_badge tables
  */
@@ -71,16 +143,58 @@ export async function loadConfig(): Promise<McpConfig> {
   // Parse config values with defaults
   const enabled = configMap.get('MCP/enabled') !== 'false'; // default true
   const port = parseInt(configMap.get('MCP/port') || '3100', 10);
-  const model = configMap.get('MCP/model') || 'anthropic/claude-sonnet-4';
-  const apiBadgeId = configMap.has('MCP/api_badge_id')
-    ? parseInt(configMap.get('MCP/api_badge_id')!, 10)
-    : null;
-  const systemPrompt = configMap.get('MCP/system_prompt') || null;
+  const configuredModel = getTrimmedValue(configMap.get('MCP/model'));
+  const configuredApiBadgeId = parseNullableInt(configMap.get('MCP/api_badge_id'));
+  const configuredConnectorId = parseNullableInt(configMap.get('MCP/llm_connector_id'));
+  const systemPrompt = getTrimmedValue(configMap.get('MCP/system_prompt'));
   const maxToolRounds = parseInt(configMap.get('MCP/max_tool_rounds') || '10', 10);
 
-  // Load API key if badge ID is set
+  let provider: ProviderService = 'openrouter';
+  let endpoint = OPENROUTER_ENDPOINT;
+  let model = configuredModel || 'anthropic/claude-sonnet-4';
+  let apiBadgeId = configuredApiBadgeId;
   let apiKey: string | null = null;
-  if (apiBadgeId !== null) {
+  let llmConnectorId: number | null = null;
+  let llmConnectorLabel: string | null = null;
+
+  if (configuredConnectorId !== null) {
+    const connectorRows = await readOnlyQuery<ConnectorRow>(
+      `SELECT c.id, c.label, c.service, c.driver, c.url, c.model, c.api_badge_id,
+              b.label AS api_badge_label, b.api_key AS connector_api_key
+         FROM core_llm_connector c
+         LEFT JOIN core_api_badge b ON b.id = c.api_badge_id
+        WHERE c.id = $1
+        LIMIT 1`,
+      [configuredConnectorId]
+    );
+
+    if (connectorRows.length === 0) {
+      throw new Error(`Configured MCP connector (${configuredConnectorId}) was not found in core_llm_connector`);
+    }
+
+    const connector = connectorRows[0];
+    const connectorService = normalizeService(connector.service, connector.driver);
+    if (!connectorService) {
+      throw new Error(
+        `Unsupported connector service/driver for MCP connector ${connector.id}: service="${connector.service || ''}" driver="${connector.driver || ''}"`
+      );
+    }
+
+    provider = connectorService;
+    endpoint = normalizeEndpoint(connector.url, connectorService);
+    if (!endpoint) {
+      throw new Error(`Connector ${connector.id} does not have a usable endpoint URL`);
+    }
+
+    model = configuredModel || getTrimmedValue(connector.model) || model;
+    apiBadgeId = connector.api_badge_id ?? configuredApiBadgeId;
+    apiKey = getTrimmedValue(connector.connector_api_key);
+    llmConnectorId = connector.id;
+    llmConnectorLabel = getTrimmedValue(connector.label);
+  }
+
+  // Fallback or override API key from explicit MCP/api_badge_id
+  if (!apiKey && apiBadgeId !== null) {
     const badgeRows = await readOnlyQuery<ApiBadgeRow>(
       `SELECT id, label, api_key FROM core_api_badge WHERE id = $1 LIMIT 1`,
       [apiBadgeId]
@@ -96,6 +210,10 @@ export async function loadConfig(): Promise<McpConfig> {
     model,
     apiBadgeId,
     apiKey,
+    provider,
+    endpoint,
+    llmConnectorId,
+    llmConnectorLabel,
     systemPrompt: systemPrompt || DEFAULT_SYSTEM_PROMPT,
     maxToolRounds,
   };

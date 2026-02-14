@@ -18,6 +18,9 @@ async function main() {
 
   console.log(`Configuration loaded:`);
   console.log(`  - Model: ${config.model}`);
+  console.log(`  - Provider: ${config.provider}`);
+  console.log(`  - Endpoint: ${config.endpoint}`);
+  console.log(`  - Connector ID: ${config.llmConnectorId ?? 'none'}`);
   console.log(`  - Port: ${config.port}`);
   console.log(`  - API Key: ${config.apiKey ? 'configured' : 'NOT configured'}`);
   console.log(`  - Max Tool Rounds: ${config.maxToolRounds}`);
