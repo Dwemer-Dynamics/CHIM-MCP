@@ -82,6 +82,7 @@ export async function callChatProvider(
     headers: getRequestHeaders(config),
     body: JSON.stringify({
       model: config.model,
+      temperature: config.temperature,
       messages,
       tools,
       tool_choice: 'auto',

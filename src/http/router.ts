@@ -21,6 +21,7 @@ interface StatusResponse {
   version: string;
   config: {
     model: string;
+    temperature: number;
     hasApiKey: boolean;
     maxToolRounds: number;
     apiBadgeId: number | null;
@@ -44,6 +45,7 @@ export function createRouter(mcpServer: McpServer): express.Router {
         version: '1.0.0',
         config: {
           model: config.model,
+          temperature: config.temperature,
           hasApiKey: Boolean(config.apiKey),
           maxToolRounds: config.maxToolRounds,
           apiBadgeId: config.apiBadgeId,
@@ -60,6 +62,7 @@ export function createRouter(mcpServer: McpServer): express.Router {
         version: '1.0.0',
         config: {
           model: '',
+          temperature: 0,
           hasApiKey: false,
           maxToolRounds: 0,
           apiBadgeId: null,
@@ -117,6 +120,7 @@ export function createRouter(mcpServer: McpServer): express.Router {
         message: 'Configuration reloaded successfully',
         config: {
           model: config.model,
+          temperature: config.temperature,
           hasApiKey: Boolean(config.apiKey),
           maxToolRounds: config.maxToolRounds,
           apiBadgeId: config.apiBadgeId,

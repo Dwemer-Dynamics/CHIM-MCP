@@ -23,6 +23,7 @@ All configuration is stored in the PostgreSQL `conf_opts` table and managed thro
 - `MCP/enabled` - Whether the server should start
 - `MCP/port` - Port (default: 3100)
 - `MCP/model` - OpenRouter model identifier
+- `MCP/temperature` - Model temperature (0-2)
 - `MCP/api_badge_id` - References `core_api_badge.id` for API key
 - `MCP/system_prompt` - Optional custom system prompt
 - `MCP/max_tool_rounds` - Max tool-call iterations

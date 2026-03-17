@@ -29,6 +29,7 @@ export interface McpConfig {
   enabled: boolean;
   port: number;
   model: string;
+  temperature: number;
   apiBadgeId: number | null;
   apiKey: string | null;
   provider: ProviderService;
@@ -109,6 +110,23 @@ function parseNullableInt(value: string | null | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function parseTemperature(value: string | null | undefined, fallback = 0.7): number {
+  if (!value) {
+    return fallback;
+  }
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  if (parsed < 0) {
+    return 0;
+  }
+  if (parsed > 2) {
+    return 2;
+  }
+  return parsed;
+}
+
 function normalizeService(service: string | null, driver: string | null): ProviderService | null {
   const serviceValue = (service || '').trim().toLowerCase();
   if (serviceValue === 'openrouter' || serviceValue === 'openai' || serviceValue === 'google' || serviceValue === 'nanogpt') {
@@ -163,14 +181,15 @@ export async function loadConfig(): Promise<McpConfig> {
   const enabled = configMap.get('MCP/enabled') !== 'false'; // default true
   const port = parseInt(configMap.get('MCP/port') || '3100', 10);
   const configuredModel = getTrimmedValue(configMap.get('MCP/model'));
+  const configuredTemperature = parseTemperature(configMap.get('MCP/temperature'), 0.7);
   const configuredApiBadgeId = parseNullableInt(configMap.get('MCP/api_badge_id'));
   const configuredConnectorId = parseNullableInt(configMap.get('MCP/llm_connector_id'));
   const systemPrompt = getTrimmedValue(configMap.get('MCP/system_prompt'));
-  const maxToolRounds = parseInt(configMap.get('MCP/max_tool_rounds') || '10', 10);
+  const maxToolRounds = parseInt(configMap.get('MCP/max_tool_rounds') || '20', 10);
 
   let provider: ProviderService = 'openrouter';
   let endpoint = OPENROUTER_ENDPOINT;
-  let model = configuredModel || 'anthropic/claude-sonnet-4';
+  let model = configuredModel || 'anthropic/claude-sonnet-4.5';
   let apiBadgeId = configuredApiBadgeId;
   let apiKey: string | null = null;
   let llmConnectorId: number | null = null;
@@ -227,6 +246,7 @@ export async function loadConfig(): Promise<McpConfig> {
     enabled,
     port,
     model,
+    temperature: configuredTemperature,
     apiBadgeId,
     apiKey,
     provider,

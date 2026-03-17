@@ -23,6 +23,7 @@ async function main() {
   console.log(`  - Connector ID: ${config.llmConnectorId ?? 'none'}`);
   console.log(`  - Port: ${config.port}`);
   console.log(`  - API Key: ${config.apiKey ? 'configured' : 'NOT configured'}`);
+  console.log(`  - Temperature: ${config.temperature}`);
   console.log(`  - Max Tool Rounds: ${config.maxToolRounds}`);
 
   // Initialize MCP server
