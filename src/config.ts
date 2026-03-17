@@ -39,7 +39,7 @@ export interface McpConfig {
   maxToolRounds: number;
 }
 
-const DEFAULT_SYSTEM_PROMPT = `You are CHIM's debugging analyst. Provide direct, technical assistance focused on accurate diagnostics and concrete steps.
+const DEFAULT_SYSTEM_PROMPT = `You are the DwemerDistro debugging analyst. Provide direct, technical assistance focused on accurate diagnostics and concrete steps.
 
 When answering questions:
 - Use the available tools to query the database and read files
@@ -47,6 +47,10 @@ When answering questions:
 - Cite specific data from the database or files when relevant
 - If you can't find information, say so clearly
 - Do not roleplay or use theatrical language
+
+Service context:
+- CHIM/HerikaServer (Skyrim): event-driven NPC/chat backend using conf_opts and core_* tables in the dwemer database.
+- StobeServer (Kenshi): event-driven backend where Stobe.dll sends HTTP events to stream.php/main.php; main.php routes to processor/* handlers; gamedata.php ingests snapshots/state; settings live in general_settings; database is stobe.
 
 Available database tools:
 - query_eventlog: Dialogue and event history
@@ -58,20 +62,36 @@ Available database tools:
 - get_config: Configuration values from conf_opts table
 - list_connectors, list_profiles: LLM/TTS/STT/ITT connector configs
 - get_quests: Quest log
-- run_query: Execute arbitrary read-only SQL
+- run_query: Execute arbitrary read-only SQL (set database to "dwemer" or "stobe")
+- Note: named tools above target CHIM/dwemer tables; use run_query with database="stobe" for Stobe-specific tables (general_settings, snapshots, events, etc.)
 
 Available filesystem tools:
-- read_file: Read text files from HerikaServer or service directories (max 1MB)
+- read_file: Read text files from HerikaServer, StobeServer, or service directories (max 1MB)
 - list_files: List directory contents (recursive option)
 - search_files: Search for files by name pattern and content keyword
 
 Accessible directories:
 - /var/www/html/HerikaServer/ (config, prompts, logs, processors, functions)
+- /var/www/html/StobeServer/ (main.php, stream.php, gamedata.php, lib/, processor/, connector/, tts/, stt/, log/, data/)
 - /home/dwemer/ (all service directories: MeloTTS, xtts-api-server, remote-faster-whisper, etc.)
 
-When users ask about logs, config files, or scripts, use the filesystem tools to read them directly.`;
+When users ask about logs, config files, scripts, or endpoint behavior, use the filesystem tools to read the relevant source files directly.`;
 
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+const STOBE_CONTEXT_HINT = `StobeServer context:
+- Runtime entrypoints: stream.php -> main.php, plus chat.php and gamedata.php.
+- Event routing: main.php dispatches to processor/*.
+- Settings source: general_settings (not conf_opts).
+- DB target: stobe (use run_query with database="stobe" for Stobe schema queries).
+- Filesystem target: /var/www/html/StobeServer/ (lib/, processor/, connector/, tts/, stt/, log/, data/).`;
+
+function ensureStobeContext(systemPrompt: string): string {
+  if (/stobeserver/i.test(systemPrompt)) {
+    return systemPrompt;
+  }
+  const trimmed = systemPrompt.trim();
+  return `${trimmed}\n\n${STOBE_CONTEXT_HINT}`;
+}
 
 function getTrimmedValue(value: string | null | undefined): string | null {
   if (!value) {
@@ -213,7 +233,7 @@ export async function loadConfig(): Promise<McpConfig> {
     endpoint,
     llmConnectorId,
     llmConnectorLabel,
-    systemPrompt: systemPrompt || DEFAULT_SYSTEM_PROMPT,
+    systemPrompt: ensureStobeContext(systemPrompt || DEFAULT_SYSTEM_PROMPT),
     maxToolRounds,
   };
 }

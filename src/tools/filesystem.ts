@@ -5,6 +5,7 @@ import { constants as fsConstants } from 'fs';
 // Allowed base paths for file access
 const ALLOWED_BASE_PATHS = [
   process.env.HERIKA_SERVER_PATH || '/var/www/html/HerikaServer',
+  process.env.STOBE_SERVER_PATH || '/var/www/html/StobeServer',
   '/home/dwemer',
 ];
 
@@ -72,7 +73,7 @@ function isBlockedDirectory(dirName: string): boolean {
 // Tool definitions
 export const readFileTool = {
   name: 'read_file',
-  description: 'Read contents of a file from HerikaServer or service directories. Cannot read binary files or files larger than 1MB.',
+  description: 'Read contents of a file from HerikaServer, StobeServer, or service directories. Cannot read binary files or files larger than 1MB.',
   inputSchema: {
     type: 'object' as const,
     properties: {

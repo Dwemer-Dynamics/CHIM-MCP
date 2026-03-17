@@ -1,8 +1,8 @@
-import { readOnlyQuery } from '../db.js';
+import { DatabaseTarget, readOnlyQuery } from '../db.js';
 
 export const runQueryTool = {
   name: 'run_query',
-  description: 'Execute an arbitrary read-only SQL query. Query must start with SELECT or WITH. Use for complex queries not covered by other tools.',
+  description: 'Execute an arbitrary read-only SQL query. Query must start with SELECT or WITH. Supports dwemer or stobe database target for cross-service diagnostics.',
   inputSchema: {
     type: 'object' as const,
     properties: {
@@ -10,12 +10,17 @@ export const runQueryTool = {
         type: 'string',
         description: 'The SQL query to execute (must be SELECT or WITH statement)',
       },
+      database: {
+        type: 'string',
+        description: 'Optional database target: "dwemer" (default) or "stobe"',
+        enum: ['dwemer', 'stobe'],
+      },
     },
     required: ['sql'],
   },
 };
 
-export async function runQuery(sql: string): Promise<unknown[]> {
+export async function runQuery(sql: string, database: DatabaseTarget = 'dwemer'): Promise<unknown[]> {
   // Validate query is read-only
   const trimmedSql = sql.trim().toUpperCase();
   
@@ -36,5 +41,5 @@ export async function runQuery(sql: string): Promise<unknown[]> {
   }
 
   // Execute query in read-only transaction
-  return readOnlyQuery(sql);
+  return readOnlyQuery(sql, undefined, { database });
 }

@@ -9,6 +9,7 @@ import { listConnectorsTool, listProfilesTool, listConnectors, listProfiles, Con
 import { getQuestsTool, getQuests, GetQuestsParams } from './quests.js';
 import { runQueryTool, runQuery } from './query.js';
 import { readFileTool, listFilesTool, searchFilesTool, readFile, listFiles, searchFiles, ReadFileParams, ListFilesParams, SearchFilesParams } from './filesystem.js';
+import { DatabaseTarget } from '../db.js';
 
 export interface ToolDefinition {
   name: string;
@@ -56,7 +57,10 @@ export const toolHandlers: Record<string, ToolHandler> = {
   list_connectors: async (params) => listConnectors((params as { type: ConnectorType }).type),
   list_profiles: async () => listProfiles(),
   get_quests: async (params) => getQuests(params as GetQuestsParams),
-  run_query: async (params) => runQuery((params as { sql: string }).sql),
+  run_query: async (params) => runQuery(
+    (params as { sql: string; database?: DatabaseTarget }).sql,
+    (params as { sql: string; database?: DatabaseTarget }).database || 'dwemer'
+  ),
   read_file: async (params) => readFile(params as ReadFileParams),
   list_files: async (params) => listFiles(params as ListFilesParams),
   search_files: async (params) => searchFiles(params as SearchFilesParams),

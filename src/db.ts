@@ -4,6 +4,11 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const { Pool } = pg;
+export type DatabaseTarget = 'dwemer' | 'stobe';
+
+interface QueryOptions {
+  database?: DatabaseTarget;
+}
 
 interface DbConfig {
   host: string;
@@ -22,24 +27,39 @@ const dbConfig: DbConfig = {
 };
 
 export const pool = new Pool(dbConfig);
+const stobeDbConfig: DbConfig = {
+  ...dbConfig,
+  database: process.env.STOBE_DB_NAME || 'stobe',
+};
+export const stobePool = new Pool(stobeDbConfig);
 
-// Test connection and set search path
-pool.on('connect', async (client) => {
-  await client.query('SET search_path TO public');
-});
+function setupPoolListeners(activePool: InstanceType<typeof Pool>, label: DatabaseTarget): void {
+  // Set search path for consistent table resolution
+  activePool.on('connect', async (client) => {
+    await client.query('SET search_path TO public');
+  });
 
-pool.on('error', (err) => {
-  console.error('Unexpected database error:', err);
-});
+  activePool.on('error', (err) => {
+    console.error(`Unexpected ${label} database error:`, err);
+  });
+}
 
-/**
- * Execute a query in a read-only transaction
- */
-export async function readOnlyQuery<T = unknown>(
+setupPoolListeners(pool, 'dwemer');
+setupPoolListeners(stobePool, 'stobe');
+
+function getPoolForDatabase(database: DatabaseTarget): InstanceType<typeof Pool> {
+  if (database === 'stobe') {
+    return stobePool;
+  }
+  return pool;
+}
+
+async function executeReadOnlyQuery<T = unknown>(
+  activePool: InstanceType<typeof Pool>,
   query: string,
   params?: unknown[]
 ): Promise<T[]> {
-  const client = await pool.connect();
+  const client = await activePool.connect();
   try {
     await client.query('BEGIN TRANSACTION READ ONLY');
     const result = await client.query(query, params);
@@ -53,22 +73,20 @@ export async function readOnlyQuery<T = unknown>(
   }
 }
 
-/**
- * Execute multiple queries in a single read-only transaction
- */
-export async function readOnlyTransaction<T = unknown>(
+async function executeReadOnlyTransaction<T = unknown>(
+  activePool: InstanceType<typeof Pool>,
   queries: Array<{ query: string; params?: unknown[] }>
 ): Promise<T[][]> {
-  const client = await pool.connect();
+  const client = await activePool.connect();
   try {
     await client.query('BEGIN TRANSACTION READ ONLY');
     const results: T[][] = [];
-    
+
     for (const { query, params } of queries) {
       const result = await client.query(query, params);
       results.push(result.rows as T[]);
     }
-    
+
     await client.query('COMMIT');
     return results;
   } catch (error) {
@@ -80,8 +98,31 @@ export async function readOnlyTransaction<T = unknown>(
 }
 
 /**
+ * Execute a query in a read-only transaction
+ */
+export async function readOnlyQuery<T = unknown>(
+  query: string,
+  params?: unknown[],
+  options: QueryOptions = {}
+): Promise<T[]> {
+  const database = options.database || 'dwemer';
+  return executeReadOnlyQuery<T>(getPoolForDatabase(database), query, params);
+}
+
+/**
+ * Execute multiple queries in a single read-only transaction
+ */
+export async function readOnlyTransaction<T = unknown>(
+  queries: Array<{ query: string; params?: unknown[] }>,
+  options: QueryOptions = {}
+): Promise<T[][]> {
+  const database = options.database || 'dwemer';
+  return executeReadOnlyTransaction<T>(getPoolForDatabase(database), queries);
+}
+
+/**
  * Close the connection pool
  */
 export async function closePool(): Promise<void> {
-  await pool.end();
+  await Promise.all([pool.end(), stobePool.end()]);
 }
