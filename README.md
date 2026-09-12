@@ -72,4 +72,4 @@ Note: named tools are CHIM/dwemer schema-focused. Use `run_query` with `database
 
 ## License
 
-MIT
+GNU GPLv3 only. See LICENSE and LICENSING.md.
