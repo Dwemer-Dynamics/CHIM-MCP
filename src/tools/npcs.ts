@@ -24,6 +24,8 @@ interface NpcRow {
   profile_id: number | null;
   dynamic_profile: boolean | null;
   extended_data: string | null;
+  // PostgreSQL JSONB is decoded by pg; older servers omit this column.
+  plugin_extended_data?: Record<string, Record<string, unknown>>;
   md5: string | null;
   gamets_last_updated: number | null;
   core: boolean | null;

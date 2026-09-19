@@ -70,6 +70,8 @@ The service is automatically started by DwemerDistro's `start_env` script.
 
 Note: named tools are CHIM/dwemer schema-focused. Use `run_query` with `database: stobe` for StobeServer tables.
 
+On migrated servers, `get_npc` also returns `plugin_extended_data` as a JSON object keyed by plugin namespace. Nested JSON objects, arrays, and scalar values retain their types. Older servers omit the field. This is read-only access; `list_npcs` continues returning basic profile summaries.
+
 ## License
 
 GNU GPLv3 only. See LICENSE and LICENSING.md.
